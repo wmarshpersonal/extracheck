@@ -55,7 +55,7 @@ func PaydaysInMonth(payday time.Time, period time.Duration) (paydays []time.Time
 	for {
 		paydays = append(paydays, t)
 		t = t.Add(period)
-		if t.Compare(last) > 0 {
+		if t.After(last) {
 			break
 		}
 	}
