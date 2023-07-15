@@ -7,118 +7,102 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSameMonthYear(t *testing.T) {
-	type args struct {
-		t1 time.Time
-		t2 time.Time
-	}
-	tests := []struct {
-		name string
-		args args
-		want bool
-	}{
-		{
-			name: "same month",
-			args: args{
-				t1: time.Date(2000 /*year*/, 2 /*mon*/, 2 /*day*/, 0 /*hour*/, 0 /*min*/, 0 /*sec*/, 0 /*nsec*/, time.UTC),
-				t2: time.Date(2000 /*year*/, 2 /*mon*/, 24 /*day*/, 0 /*hour*/, 0 /*min*/, 0 /*sec*/, 0 /*nsec*/, time.UTC),
-			},
-			want: true,
-		},
-		{
-			name: "same month, different year",
-			args: args{
-				t1: time.Date(2000 /*year*/, time.February /*mon*/, 2 /*day*/, 0 /*hour*/, 0 /*min*/, 0 /*sec*/, 0 /*nsec*/, time.UTC),
-				t2: time.Date(2001 /*year*/, time.February /*mon*/, 24 /*day*/, 0 /*hour*/, 0 /*min*/, 0 /*sec*/, 0 /*nsec*/, time.UTC),
-			},
-			want: false,
-		},
-		{
-			name: "same month via normalization (days: 40th February == March)",
-			args: args{
-				t1: time.Date(2000 /*year*/, time.March /*mon*/, 2 /*day*/, 0 /*hour*/, 0 /*min*/, 0 /*sec*/, 0 /*nsec*/, time.UTC),
-				t2: time.Date(2000 /*year*/, time.February /*mon*/, 40 /*day*/, 0 /*hour*/, 0 /*min*/, 0 /*sec*/, 0 /*nsec*/, time.UTC),
-			},
-			want: true,
-		},
-		{
-			name: "different month via normalization (days: 31st February != February)",
-			args: args{
-				t1: time.Date(2000 /*year*/, time.February /*mon*/, 2 /*day*/, 0 /*hour*/, 0 /*min*/, 0 /*sec*/, 0 /*nsec*/, time.UTC),
-				t2: time.Date(2000 /*year*/, time.February /*mon*/, 31 /*day*/, 0 /*hour*/, 0 /*min*/, 0 /*sec*/, 0 /*nsec*/, time.UTC),
-			},
-			want: false,
-		},
-		{
-			name: "different month via normalization (hours: February 2 744:15:15 != February)",
-			args: args{
-				t1: time.Date(2000 /*year*/, time.February /*mon*/, 2 /*day*/, 0 /*hour*/, 0 /*min*/, 0 /*sec*/, 0 /*nsec*/, time.UTC),
-				t2: time.Date(2000 /*year*/, time.February /*mon*/, 2 /*day*/, 24*31 /*hour*/, 15 /*min*/, 15 /*sec*/, 0 /*nsec*/, time.UTC),
-			},
-			want: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := SameMonthYear(tt.args.t1, tt.args.t2); got != tt.want {
-				t.Errorf("SameMonth() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestFirstPaydayInMonth(t *testing.T) {
-	const oneweek = 7 * 24 * time.Hour
-
-	t.Run("period must be positive", func(t *testing.T) {
-		assert.Panics(t, func() { FirstPaydayInMonth(time.Now(), 0) })
-		assert.Panics(t, func() { FirstPaydayInMonth(time.Now(), -time.Second) })
+func TestFirstOfMonth(t *testing.T) {
+	t.Run("jan 2023", func(t *testing.T) {
+		res := FirstOfMonth(time.Date(2023, time.January, 22, 0, 0, 0, 0, time.UTC))
+		assert.Equal(t, time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC), res)
 	})
-	t.Run("reference date is first, result is reference date", func(t *testing.T) {
-		april3rd := time.Date(2000, time.April, 3, 0, 0, 0, 0, time.UTC)
-		v := FirstPaydayInMonth(april3rd, oneweek)
-		assert.Equal(t, april3rd, v)
+	t.Run("feb 2023", func(t *testing.T) {
+		res := FirstOfMonth(time.Date(2023, time.February, 22, 0, 0, 0, 0, time.UTC))
+		assert.Equal(t, time.Date(2023, time.February, 1, 0, 0, 0, 0, time.UTC), res)
 	})
-	t.Run("reference date is last, result is earlier", func(t *testing.T) {
-		april3rd := time.Date(2000, time.April, 3, 0, 0, 0, 0, time.UTC)
-		april24th := time.Date(2000, time.April, 24, 0, 0, 0, 0, time.UTC)
-		v := FirstPaydayInMonth(april24th, oneweek)
-		assert.Equal(t, april3rd, v)
+	t.Run("feb 2024 (leap year)", func(t *testing.T) {
+		res := FirstOfMonth(time.Date(2024, time.February, 29, 0, 0, 0, 0, time.UTC))
+		assert.Equal(t, time.Date(2024, time.February, 1, 0, 0, 0, 0, time.UTC), res)
 	})
-	t.Run("interval > 1 month, result is reference date", func(t *testing.T) {
-		april24th := time.Date(2000, time.April, 24, 0, 0, 0, 0, time.UTC)
-		v := FirstPaydayInMonth(april24th, 5*oneweek)
-		assert.Equal(t, april24th, v)
+	t.Run("wide range", func(t *testing.T) {
+		const iterations = 500
+		const twentyEightDays = 28 * 24 * time.Hour
+		cur := time.Now()
+		for i := 0; i < iterations; i++ {
+			cur = cur.Add(twentyEightDays)
+			res := FirstOfMonth(cur)
+			assert.Equal(t, cur.Year(), res.Year())
+			assert.Equal(t, cur.Month(), res.Month())
+			assert.NotEqual(t, cur.Month(), res.Add(-1).Month())
+		}
 	})
 }
 
-func TestLastPaydayInMonth(t *testing.T) {
-	const oneweek = 7 * 24 * time.Hour
+func TestLastOfMonth(t *testing.T) {
+	t.Run("jan 2023", func(t *testing.T) {
+		res := LastOfMonth(time.Date(2023, time.January, 22, 0, 0, 0, 0, time.UTC))
+		assert.Equal(t, time.Date(2023, time.January, 31, 23, 59, 59, 999999999, time.UTC), res)
+	})
+	t.Run("feb 2023", func(t *testing.T) {
+		res := LastOfMonth(time.Date(2023, time.February, 22, 0, 0, 0, 0, time.UTC))
+		assert.Equal(t, time.Date(2023, time.February, 28, 23, 59, 59, 999999999, time.UTC), res)
+	})
+	t.Run("feb 2024 (leap year)", func(t *testing.T) {
+		res := LastOfMonth(time.Date(2024, time.February, 22, 0, 0, 0, 0, time.UTC))
+		assert.Equal(t, time.Date(2024, time.February, 29, 23, 59, 59, 999999999, time.UTC), res)
+	})
+	t.Run("wide range", func(t *testing.T) {
+		const iterations = 500
+		const twentyEightDays = 28 * 24 * time.Hour
+		cur := time.Now()
+		for i := 0; i < iterations; i++ {
+			cur = cur.Add(twentyEightDays)
+			res := LastOfMonth(cur)
+			assert.Equal(t, cur.Year(), res.Year())
+			assert.Equal(t, cur.Month(), res.Month())
+			assert.NotEqual(t, cur.Month(), res.Add(1).Month())
+		}
+	})
+}
+
+func TestPaydaysInRange(t *testing.T) {
+	const twoWeeks = 2 * 7 * 24 * time.Hour
 
 	t.Run("period must be positive", func(t *testing.T) {
-		assert.Panics(t, func() { LastPaydayInMonth(time.Now(), 0) })
-		assert.Panics(t, func() { LastPaydayInMonth(time.Now(), -time.Second) })
+		assert.Panics(t, func() { PaydaysInRange(time.Unix(0, 0), time.Unix(0, 0), time.Unix(1, 0), 0) })
+		assert.Panics(t, func() { PaydaysInRange(time.Now(), time.Unix(0, 0), time.Unix(1, 0), -time.Second) })
 	})
-	t.Run("reference date is last, result is reference date", func(t *testing.T) {
-		april24th := time.Date(2000, time.April, 24, 0, 0, 0, 0, time.UTC)
-		v := LastPaydayInMonth(april24th, oneweek)
-		assert.Equal(t, april24th, v)
+	t.Run("d1 must less than d2", func(t *testing.T) {
+		assert.Panics(t, func() { PaydaysInRange(time.Unix(0, 0), time.Unix(100, 0), time.Unix(100, 0), 1) })
+		assert.Panics(t, func() { PaydaysInRange(time.Unix(0, 0), time.Unix(200, 0), time.Unix(100, 0), 1) })
 	})
-	t.Run("reference date is first, result is later", func(t *testing.T) {
-		april3rd := time.Date(2000, time.April, 3, 0, 0, 0, 0, time.UTC)
-		april24th := time.Date(2000, time.April, 24, 0, 0, 0, 0, time.UTC)
-		v := LastPaydayInMonth(april3rd, oneweek)
-		assert.Equal(t, april24th, v)
+
+	t.Run("first biweekly payday mar 8th, expect two paydays between mar 5th and mar 23", func(t *testing.T) {
+		paydays := []time.Time{
+			time.Date(2000, time.March, 8, 0, 0, 0, 0, time.UTC),
+			time.Date(2000, time.March, 22, 0, 0, 0, 0, time.UTC),
+		}
+		res := PaydaysInRange(
+			time.Date(2000, time.March, 8, 0, 0, 0, 0, time.UTC),
+			time.Date(2000, time.March, 5, 0, 0, 0, 0, time.UTC),
+			time.Date(2000, time.March, 23, 0, 0, 0, 0, time.UTC),
+			twoWeeks)
+		assert.EqualValues(t, paydays, res)
 	})
-	t.Run("interval > 1 month, result is reference date", func(t *testing.T) {
-		april24th := time.Date(2000, time.April, 24, 0, 0, 0, 0, time.UTC)
-		v := LastPaydayInMonth(april24th, 5*oneweek)
-		assert.Equal(t, april24th, v)
+
+	t.Run("first biweekly payday mar 25th, expect two paydays between apr 5th and apr 23", func(t *testing.T) {
+		paydays := []time.Time{
+			time.Date(2000, time.April, 8, 0, 0, 0, 0, time.UTC),
+			time.Date(2000, time.April, 22, 0, 0, 0, 0, time.UTC),
+		}
+		res := PaydaysInRange(
+			time.Date(2000, time.March, 25, 0, 0, 0, 0, time.UTC),
+			time.Date(2000, time.April, 5, 0, 0, 0, 0, time.UTC),
+			time.Date(2000, time.April, 23, 0, 0, 0, 0, time.UTC),
+			twoWeeks)
+		assert.EqualValues(t, paydays, res)
 	})
 }
 
 func TestPaydaysInMonth(t *testing.T) {
-	const biweekly = 2 * 7 * 24 * time.Hour
+	const twoWeeks = 2 * 7 * 24 * time.Hour
+
 	t.Run("period must be positive", func(t *testing.T) {
 		assert.Panics(t, func() { PaydaysInMonth(time.Now(), 0) })
 		assert.Panics(t, func() { PaydaysInMonth(time.Now(), -time.Second) })
@@ -131,7 +115,7 @@ func TestPaydaysInMonth(t *testing.T) {
 		}
 
 		for _, refPayday := range paydays {
-			v := PaydaysInMonth(refPayday, biweekly)
+			v := PaydaysInMonth(refPayday, twoWeeks)
 			assert.EqualValues(t, paydays, v)
 		}
 	})
@@ -142,7 +126,7 @@ func TestPaydaysInMonth(t *testing.T) {
 		}
 
 		for _, refPayday := range paydays {
-			v := PaydaysInMonth(refPayday, biweekly)
+			v := PaydaysInMonth(refPayday, twoWeeks)
 			assert.EqualValues(t, paydays, v)
 		}
 	})
