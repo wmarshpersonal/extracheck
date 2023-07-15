@@ -24,32 +24,30 @@ func PaydaysInRange(payday, d1, d2 time.Time, period time.Duration) (paydays []t
 		panic("d1 >= d2")
 	}
 
-	var first time.Time
+	var t time.Time
 	switch payday.Compare(d1) {
 	case -1: // payday < d1
 		diff := d1.Sub(payday)
 		truncDiff := diff.Abs().Truncate(period)
-		first = payday.Add(truncDiff)
-		if first.Before(d1) {
-			first = first.Add(period)
+		t = payday.Add(truncDiff)
+		if t.Before(d1) {
+			t = t.Add(period)
 		}
 	case 1: //payday > d1
 		diff := d1.Sub(payday)
 		truncDiff := diff.Abs().Truncate(period)
-		first = payday.Add(-truncDiff)
-		if first.Before(d1) {
-			first = first.Add(period)
+		t = payday.Add(-truncDiff)
+		if t.Before(d1) {
+			t = t.Add(period)
 		}
 	default:
-		first = d1
+		t = d1
 	}
 
-	last := d2
-	t := first
 	for {
 		paydays = append(paydays, t)
 		t = t.Add(period)
-		if t.Compare(last) != -1 {
+		if t.Compare(d2) != -1 {
 			break
 		}
 	}
